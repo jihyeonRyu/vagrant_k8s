@@ -1,0 +1,37 @@
+BOX_IMAGE = "bento/ubuntu-22.04"
+WORKER_COUNT = 2
+POD_CIDR = "172.18.0.0/16"
+API_ADV_ADDRESS = "192.168.56.10"
+
+Vagrant.configure("2") do |config|
+  config.vm.box = BOX_IMAGE
+
+  config.vm.define "kube-control-plane" do |node|
+    node.vm.hostname = "kube-control-plane"
+    node.vm.network :private_network, ip: "192.168.56.10"
+    node.vm.provider "virtualbox" do |vb|
+      vb.memory = "2048"
+      vb.cpus = "2"
+    end
+    node.vm.provision "shell", path: "common.sh"
+    node.vm.provision "shell", path: "control-plane.sh", args: "#{POD_CIDR} #{API_ADV_ADDRESS}"
+    node.vm.provision "shell", path: "setup.sh"
+  end
+
+  (1..WORKER_COUNT).each do |i|
+    config.vm.define "kube-worker-#{i}" do |node|
+      node.vm.hostname = "kube-worker-#{i}"
+      node.vm.network :private_network, ip: "192.168.56.#{i + 20}"
+      node.vm.provider "virtualbox" do |vb|
+        vb.memory = "2048"
+        vb.cpus = "2"
+      end
+      node.vm.provision "shell", path: "common.sh"
+      node.vm.provision "shell", path: "worker.sh", args: "#{i}"
+    end
+  end
+
+  config.vm.provision "shell",
+    run: "always",
+    inline: "swapoff -a"
+end
