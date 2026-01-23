@@ -1,9 +1,9 @@
 # vagrant_k8s
 
-Kubernetes VM for test
+Kubernetes VM for test (w/o GPUs)
 
-## 1. Install Vagrant (Virtual Machine)
-[Vagrant Installation](https://developer.hashicorp.com/vagrant/docs/installation)
+## 1. Installation
+Requires the installation of the tools [Vagrant](https://developer.hashicorp.com/vagrant) and a [VMware provider](https://developer.hashicorp.com/vagrant/docs/providers/vmware/installation).
 
 
 ## 2. Start 
