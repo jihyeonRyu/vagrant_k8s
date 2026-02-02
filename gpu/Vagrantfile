@@ -1,0 +1,150 @@
+# -*- mode: ruby -*-
+# vi: set ft=ruby :
+#
+# GPU Kubernetes Cluster with PCI Passthrough
+# Provider: libvirt (required for PCI passthrough)
+#
+
+require 'yaml'
+
+# 설정 파일 로드
+CONFIG_FILE = File.join(File.dirname(__FILE__), 'gpu-config.yaml')
+unless File.exist?(CONFIG_FILE)
+  abort("Error: gpu-config.yaml 파일을 찾을 수 없습니다.\ngpu-config.yaml.example을 복사하여 설정하세요.")
+end
+
+config_data = YAML.load_file(CONFIG_FILE)
+
+# VM 설정
+BOX_IMAGE = "generic/ubuntu2204"  # libvirt 지원 이미지
+WORKER_COUNT = config_data['worker_gpu_assignment']&.keys&.length || 2
+POD_CIDR = "172.18.0.0/16"
+API_ADV_ADDRESS = "192.168.122.10"
+NETWORK_PREFIX = "192.168.122"
+
+# VM 리소스 설정
+VM_RESOURCES = config_data['vm_resources'] || {}
+CP_MEMORY = VM_RESOURCES.dig('control_plane', 'memory') || 4096
+CP_CPUS = VM_RESOURCES.dig('control_plane', 'cpus') || 2
+WORKER_MEMORY = VM_RESOURCES.dig('worker', 'memory') || 32768
+WORKER_CPUS = VM_RESOURCES.dig('worker', 'cpus') || 8
+
+# GPU 설정 파싱
+GPUS = config_data['gpus'] || []
+WORKER_GPU_ASSIGNMENT = config_data['worker_gpu_assignment'] || {}
+
+# PCI 주소를 libvirt 형식으로 파싱하는 함수
+def parse_pci_address(pci_addr)
+  # 형식: 0000:41:00.0 -> domain:bus:slot.function
+  if pci_addr =~ /([0-9a-fA-F]{4}):([0-9a-fA-F]{2}):([0-9a-fA-F]{2})\.([0-9a-fA-F])/
+    {
+      domain: $1,
+      bus: "0x#{$2}",
+      slot: "0x#{$3}",
+      function: "0x#{$4}"
+    }
+  else
+    nil
+  end
+end
+
+Vagrant.configure("2") do |config|
+  config.vm.box = BOX_IMAGE
+  
+  # libvirt provider 기본 설정
+  config.vm.provider :libvirt do |libvirt|
+    libvirt.driver = "kvm"
+    libvirt.uri = "qemu:///system"
+  end
+
+  # Vagrant 공유 폴더 비활성화 (libvirt에서 문제 방지)
+  config.vm.synced_folder ".", "/vagrant", type: "rsync",
+    rsync__exclude: [".git/", "*.log"]
+
+  # ============================================
+  # Control Plane Node
+  # ============================================
+  config.vm.define "gpu-control-plane" do |node|
+    node.vm.hostname = "gpu-control-plane"
+    node.vm.network :private_network, 
+      ip: "#{NETWORK_PREFIX}.10",
+      libvirt__network_name: "gpu-k8s-net",
+      libvirt__dhcp_enabled: false
+
+    node.vm.provider :libvirt do |libvirt|
+      libvirt.memory = CP_MEMORY
+      libvirt.cpus = CP_CPUS
+      libvirt.machine_type = "q35"
+    end
+
+    # 프로비저닝 스크립트
+    node.vm.provision "shell", path: "common-gpu.sh"
+    node.vm.provision "shell", path: "control-plane-gpu.sh", 
+      args: "#{POD_CIDR} #{API_ADV_ADDRESS}"
+    node.vm.provision "shell", path: "setup-gpu-operator.sh"
+  end
+
+  # ============================================
+  # Worker Nodes with GPU Passthrough
+  # ============================================
+  WORKER_GPU_ASSIGNMENT.each_with_index do |(worker_name, gpu_indices), idx|
+    worker_num = idx + 1
+    
+    config.vm.define "gpu-#{worker_name}" do |node|
+      node.vm.hostname = "gpu-#{worker_name}"
+      node.vm.network :private_network,
+        ip: "#{NETWORK_PREFIX}.#{20 + worker_num}",
+        libvirt__network_name: "gpu-k8s-net",
+        libvirt__dhcp_enabled: false
+
+      node.vm.provider :libvirt do |libvirt|
+        libvirt.memory = WORKER_MEMORY
+        libvirt.cpus = WORKER_CPUS
+        libvirt.machine_type = "q35"
+        
+        # CPU 패스스루 모드 (NVIDIA 드라이버 호환성)
+        libvirt.cpu_mode = "host-passthrough"
+        
+        # IOMMU 활성화
+        libvirt.features = ['ioapic']
+        
+        # GPU PCI Passthrough
+        gpu_indices.each do |gpu_idx|
+          gpu = GPUS[gpu_idx]
+          next unless gpu
+          
+          # GPU 본체 패스스루
+          pci = parse_pci_address(gpu['pci_address'])
+          if pci
+            libvirt.pci :domain => pci[:domain], 
+                        :bus => pci[:bus], 
+                        :slot => pci[:slot], 
+                        :function => pci[:function]
+          end
+          
+          # GPU Audio 패스스루 (있는 경우)
+          if gpu['audio_address']
+            audio_pci = parse_pci_address(gpu['audio_address'])
+            if audio_pci
+              libvirt.pci :domain => audio_pci[:domain],
+                          :bus => audio_pci[:bus],
+                          :slot => audio_pci[:slot],
+                          :function => audio_pci[:function]
+            end
+          end
+        end
+      end
+
+      # 프로비저닝 스크립트
+      node.vm.provision "shell", path: "common-gpu.sh"
+      node.vm.provision "shell", path: "worker-gpu.sh", args: "#{worker_num}"
+    end
+  end
+
+  # ============================================
+  # 모든 노드 공통 설정
+  # ============================================
+  config.vm.provision "shell",
+    run: "always",
+    inline: "swapoff -a"
+end

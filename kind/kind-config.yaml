@@ -1,0 +1,48 @@
+# Kind 클러스터 설정 - GPU 멀티노드
+#
+# 각 Worker 노드에 다른 GPU가 할당되도록 NVIDIA_VISIBLE_DEVICES 설정
+# 이 설정은 setup.sh에서 동적으로 생성됩니다.
+#
+# 수동 사용 예시:
+#   kind create cluster --config kind-config.yaml --name gpu-cluster
+#
+
+kind: Cluster
+apiVersion: kind.x-k8s.io/v1alpha4
+name: gpu-cluster
+
+nodes:
+  # Control Plane (GPU 불필요)
+  - role: control-plane
+    kubeadmConfigPatches:
+      - |
+        kind: InitConfiguration
+        nodeRegistration:
+          kubeletExtraArgs:
+            node-labels: "node-role.kubernetes.io/control-plane="
+
+  # Worker 1: GPU 0,1,2,3
+  - role: worker
+    extraMounts:
+      # NVIDIA 디바이스 마운트
+      - hostPath: /dev/null
+        containerPath: /dev/null
+    labels:
+      gpu-worker: "1"
+      nvidia.com/gpu.present: "true"
+
+  # Worker 2: GPU 4,5,6,7
+  - role: worker
+    extraMounts:
+      - hostPath: /dev/null
+        containerPath: /dev/null
+    labels:
+      gpu-worker: "2"
+      nvidia.com/gpu.present: "true"
+
+# 네트워킹 설정
+networking:
+  # Pod CIDR
+  podSubnet: "10.244.0.0/16"
+  # Service CIDR
+  serviceSubnet: "10.96.0.0/12"

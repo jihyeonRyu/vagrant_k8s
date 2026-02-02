@@ -1,0 +1,52 @@
+# GPU Configuration for PCI Passthrough
+# 
+# lspci -nn | grep -i nvidia 명령으로 GPU PCI 주소와 벤더/디바이스 ID 확인
+# 예시 출력: 41:00.0 3D controller [0302]: NVIDIA Corporation ... [10de:2330]
+#
+# 각 GPU는 보통 2개의 PCI 기능을 가짐:
+#   - .0: GPU 본체 (3D controller)
+#   - .1: Audio device (HD Audio Controller)
+
+# GPU 디바이스 목록
+# vendor_id: device_id 형식 (예: 10de:2330)
+# 모든 GPU가 동일 모델이면 하나만 지정
+gpu_device_ids:
+  - "10de:2330"  # NVIDIA GPU (lspci -nn 출력에서 확인)
+  - "10de:1aef"  # NVIDIA Audio (옵션)
+
+# GPU PCI 주소 목록 (lspci | grep -i nvidia 로 확인)
+# bus:slot.function 형식
+gpus:
+  # Worker 1에 할당될 GPU (인덱스 0-3)
+  - pci_address: "0000:41:00.0"
+    audio_address: "0000:41:00.1"
+  - pci_address: "0000:42:00.0"
+    audio_address: "0000:42:00.1"
+  - pci_address: "0000:43:00.0"
+    audio_address: "0000:43:00.1"
+  - pci_address: "0000:44:00.0"
+    audio_address: "0000:44:00.1"
+  
+  # Worker 2에 할당될 GPU (인덱스 4-7)
+  - pci_address: "0000:45:00.0"
+    audio_address: "0000:45:00.1"
+  - pci_address: "0000:46:00.0"
+    audio_address: "0000:46:00.1"
+  - pci_address: "0000:47:00.0"
+    audio_address: "0000:47:00.1"
+  - pci_address: "0000:48:00.0"
+    audio_address: "0000:48:00.1"
+
+# Worker별 GPU 할당 (GPU 인덱스 기반)
+worker_gpu_assignment:
+  worker-1: [0, 1, 2, 3]
+  worker-2: [4, 5, 6, 7]
+
+# VM 리소스 설정
+vm_resources:
+  control_plane:
+    memory: 4096   # MB
+    cpus: 2
+  worker:
+    memory: 32768  # MB (GPU 워크로드용 충분한 메모리)
+    cpus: 8
