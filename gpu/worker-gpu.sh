@@ -78,3 +78,4 @@ if lspci | grep -qi nvidia; then
     echo "nvidia-smi 출력 (드라이버 로드 후):"
     nvidia-smi 2>/dev/null || echo "  (드라이버가 아직 로드되지 않음 - 재부팅 필요할 수 있음)"
 fi
+b
