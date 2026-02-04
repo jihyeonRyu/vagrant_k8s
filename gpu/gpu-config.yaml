@@ -10,7 +10,7 @@ gpu_device_ids:
 
 # GPU PCI 주소 목록 (lspci 출력에서 확인)
 # 형식: 0000:bus:slot.function
-gpus:y
+gpus:
   # Worker 1에 할당될 GPU (인덱스 0-3)
   - pci_address: "0000:0a:00.0"
   - pci_address: "0000:18:00.0"
