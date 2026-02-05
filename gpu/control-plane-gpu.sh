@@ -23,13 +23,19 @@ echo "API_ADV_ADDRESS: ${API_ADV_ADDRESS}"
 echo ""
 
 # ============================================
+# 미리 정의된 부트스트랩 토큰 (Worker 조인용)
+# ============================================
+BOOTSTRAP_TOKEN="abcdef.0123456789abcdef"
+
+# ============================================
 # kubeadm 초기화
 # ============================================
 echo "[1/4] kubeadm init 실행..."
 kubeadm init \
     --pod-network-cidr "$POD_CIDR" \
     --apiserver-advertise-address "$API_ADV_ADDRESS" \
-    | tee /vagrant/kubeadm-init.out
+    --token "$BOOTSTRAP_TOKEN" \
+    --token-ttl 0
 
 # ============================================
 # kubelet 설정
@@ -81,5 +87,6 @@ echo "=========================================="
 echo "Control Plane 초기화 완료!"
 echo "=========================================="
 echo ""
-echo "Worker 노드 조인 명령어가 /vagrant/kubeadm-init.out에 저장되었습니다."
+echo "Worker 노드가 자동으로 조인됩니다."
+echo "사용 토큰: ${BOOTSTRAP_TOKEN}"
 echo "호스트에서 사용할 kubeconfig: ./admin.conf"

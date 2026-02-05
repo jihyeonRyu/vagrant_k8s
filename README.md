@@ -129,6 +129,12 @@ sudo ./unbind-vfio.sh
 sudo systemctl start nvidia-fabricmanager nvidia-persistenced
 ```
 
+## 파일 동기화
+```bash
+# on host
+vagrant rsync
+```
+
 자세한 내용은 [gpu/README.md](gpu/README.md)를 참조하세요.
 
 ---

@@ -19,6 +19,17 @@ echo "NVIDIA Driver Version: ${NVIDIA_DRIVER_VERSION}"
 echo ""
 
 # ============================================
+# /etc/hosts 설정 (노드 간 통신)
+# ============================================
+echo "[0/7] /etc/hosts 설정..."
+NETWORK_PREFIX="192.168.122"
+cat >> /etc/hosts <<EOF
+${NETWORK_PREFIX}.10  gpu-control-plane
+${NETWORK_PREFIX}.21  gpu-worker-1
+${NETWORK_PREFIX}.22  gpu-worker-2
+EOF
+
+# ============================================
 # 기본 패키지 설치
 # ============================================
 echo "[1/7] 기본 패키지 설치..."
@@ -29,6 +40,7 @@ apt-get install -y \
     curl \
     gnupg \
     lsb-release \
+    netcat-openbsd \
     software-properties-common \
     socat \
     wget
