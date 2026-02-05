@@ -78,8 +78,11 @@ wget -q https://raw.githubusercontent.com/projectcalico/calico/v3.29.1/manifests
 
 # POD_CIDR에 맞게 수정
 sed -i "s~cidr: 192\.168\.0\.0/16~cidr: ${POD_CIDR}~g" custom-resources.yaml
+
 # Vagrant 환경용: vxlanMode를 Always로 변경
 sed -i "s~vxlanMode: CrossSubnet~vxlanMode: Always~g" custom-resources.yaml
+
+sed -i "s~encapsulation: VXLANCrossSubnet~encapsulation: VXLAN~g" custom-resources.yaml  # 추가!
 
 kubectl create -f custom-resources.yaml
 rm -f custom-resources.yaml
