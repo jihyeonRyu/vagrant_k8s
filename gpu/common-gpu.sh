@@ -173,7 +173,7 @@ fi
 # 사용자 편의 설정
 # ============================================
 echo "alias k=kubectl" >> /home/vagrant/.bashrc
-echo "export KUBECONFIG=/etc/kubernetes/admin.conf" >> /home/vagrant/.bashrc
+echo "export KUBECONFIG=\$HOME/.kube/config" >> /home/vagrant/.bashrc
 
 echo ""
 echo "=========================================="
