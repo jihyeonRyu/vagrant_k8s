@@ -161,6 +161,39 @@ if lspci | grep -qi nvidia; then
     # containerd에 NVIDIA 런타임 설정
     nvidia-ctk runtime configure --runtime=containerd
     
+    # CDI (Container Device Interface) 설정 생성
+    # 드라이버가 로드된 후에도 실행할 수 있도록 부팅 시 자동 실행 스크립트 추가
+    mkdir -p /etc/cdi
+    
+    # 부팅 시 CDI 설정 생성 스크립트 (드라이버 로드 후 실행)
+    cat > /etc/systemd/system/nvidia-cdi-generate.service <<'EOFSERVICE'
+[Unit]
+Description=Generate NVIDIA CDI configuration
+After=nvidia-persistenced.service
+Requires=nvidia-persistenced.service
+ConditionPathExists=/dev/nvidia0
+
+[Service]
+Type=oneshot
+ExecStart=/usr/bin/nvidia-ctk cdi generate --output=/etc/cdi/nvidia.yaml
+ExecStartPost=/bin/systemctl restart containerd
+RemainAfterExit=yes
+
+[Install]
+WantedBy=multi-user.target
+EOFSERVICE
+    
+    systemctl daemon-reload
+    systemctl enable nvidia-cdi-generate.service
+    
+    # 현재 드라이버가 로드되어 있으면 바로 CDI 생성
+    if nvidia-smi &>/dev/null; then
+        echo "  NVIDIA 드라이버 로드됨. CDI 설정 생성..."
+        nvidia-ctk cdi generate --output=/etc/cdi/nvidia.yaml
+    else
+        echo "  NVIDIA 드라이버가 아직 로드되지 않음. 재부팅 후 CDI 설정이 자동 생성됩니다."
+    fi
+    
     # containerd 재시작
     systemctl restart containerd
     
