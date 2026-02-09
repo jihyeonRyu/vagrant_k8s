@@ -33,6 +33,9 @@ vm_resources:
   control_plane:
     memory: 8192   # MB
     cpus: 4
+    disk: 100      # GB
   worker:
     memory: 65536  # 64GB (H100 워크로드용)
     cpus: 16
+    disk: 500      # GB (모델 캐시 + 컨테이너 이미지용)
+

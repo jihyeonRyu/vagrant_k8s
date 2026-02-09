@@ -26,8 +26,10 @@ NETWORK_PREFIX = "192.168.122"
 VM_RESOURCES = config_data['vm_resources'] || {}
 CP_MEMORY = VM_RESOURCES.dig('control_plane', 'memory') || 4096
 CP_CPUS = VM_RESOURCES.dig('control_plane', 'cpus') || 2
+CP_DISK = VM_RESOURCES.dig('control_plane', 'disk') || 100
 WORKER_MEMORY = VM_RESOURCES.dig('worker', 'memory') || 32768
 WORKER_CPUS = VM_RESOURCES.dig('worker', 'cpus') || 8
+WORKER_DISK = VM_RESOURCES.dig('worker', 'disk') || 500
 
 # GPU 설정 파싱
 GPUS = config_data['gpus'] || []
@@ -78,6 +80,7 @@ Vagrant.configure("2") do |config|
       libvirt.memory = CP_MEMORY
       libvirt.cpus = CP_CPUS
       libvirt.machine_type = "q35"
+      libvirt.machine_virtual_size = CP_DISK  # 디스크 크기 (GB)
     end
 
     # 프로비저닝 스크립트
@@ -104,6 +107,7 @@ Vagrant.configure("2") do |config|
         libvirt.memory = WORKER_MEMORY
         libvirt.cpus = WORKER_CPUS
         libvirt.machine_type = "q35"
+        libvirt.machine_virtual_size = WORKER_DISK  # 디스크 크기 (GB)
         
         # CPU 패스스루 모드 (NVIDIA 드라이버 호환성)
         libvirt.cpu_mode = "host-passthrough"
@@ -151,3 +155,4 @@ Vagrant.configure("2") do |config|
     run: "always",
     inline: "swapoff -a"
 end
+
