@@ -19,9 +19,39 @@ echo "NVIDIA Driver Version: ${NVIDIA_DRIVER_VERSION}"
 echo ""
 
 # ============================================
+# 디스크 자동 확장 (LVM)
+# ============================================
+echo "[0/8] 디스크 확장 확인..."
+# generic/ubuntu2204 box는 LVM 사용. machine_virtual_size로 디스크가 커져도
+# 파티션/LVM이 자동 확장되지 않으므로 여기서 처리
+apt-get install -y cloud-guest-utils 2>/dev/null || true
+
+ROOT_DISK=$(lsblk -ndo NAME,TYPE | grep disk | head -1 | awk '{print $1}')
+if [ -n "$ROOT_DISK" ]; then
+    ROOT_PART=$(lsblk -nlo NAME,TYPE "/dev/${ROOT_DISK}" | grep part | tail -1 | awk '{print $1}')
+    PART_NUM=$(echo "$ROOT_PART" | grep -oE '[0-9]+$')
+    
+    if [ -n "$PART_NUM" ]; then
+        echo "  Disk: /dev/${ROOT_DISK}, Partition: /dev/${ROOT_PART} (#${PART_NUM})"
+        # 파티션 확장
+        growpart "/dev/${ROOT_DISK}" "${PART_NUM}" 2>/dev/null && echo "  Partition extended" || echo "  Partition already at max size"
+        # PV 확장 (LVM)
+        pvresize "/dev/${ROOT_PART}" 2>/dev/null && echo "  PV resized" || true
+        # LV 확장
+        lvextend -l +100%FREE /dev/mapper/ubuntu--vg-ubuntu--lv 2>/dev/null && echo "  LV extended" || true
+        # 파일시스템 확장
+        resize2fs /dev/mapper/ubuntu--vg-ubuntu--lv 2>/dev/null && echo "  Filesystem resized" || true
+    fi
+fi
+
+echo "  Disk usage:"
+df -h / | tail -1
+echo ""
+
+# ============================================
 # /etc/hosts 설정 (노드 간 통신)
 # ============================================
-echo "[0/7] /etc/hosts 설정..."
+echo "[1/8] /etc/hosts 설정..."
 NETWORK_PREFIX="192.168.122"
 cat >> /etc/hosts <<EOF
 ${NETWORK_PREFIX}.10  gpu-control-plane
@@ -32,7 +62,7 @@ EOF
 # ============================================
 # 기본 패키지 설치
 # ============================================
-echo "[1/7] 기본 패키지 설치..."
+echo "[2/8] 기본 패키지 설치..."
 apt-get update
 apt-get install -y \
     apt-transport-https \
@@ -48,7 +78,7 @@ apt-get install -y \
 # ============================================
 # containerd 설치
 # ============================================
-echo "[2/7] containerd 설치..."
+echo "[3/8] containerd 설치..."
 mkdir -p /etc/apt/keyrings
 curl -fsSL https://download.docker.com/linux/ubuntu/gpg | gpg --dearmor -o /etc/apt/keyrings/docker.gpg
 echo \
@@ -68,7 +98,7 @@ systemctl restart containerd
 # ============================================
 # CNI 플러그인 설치
 # ============================================
-echo "[3/7] CNI 플러그인 설치..."
+echo "[4/8] CNI 플러그인 설치..."
 ARCH=$(uname -m)
 case "$ARCH" in
     x86_64) ARCH="amd64" ;;
@@ -86,7 +116,7 @@ rm -f "cni-plugins-linux-${ARCH}-${CNI_VERSION}.tgz"
 # ============================================
 # Kubernetes 설치
 # ============================================
-echo "[4/7] Kubernetes 설치..."
+echo "[5/8] Kubernetes 설치..."
 curl -fsSL "https://pkgs.k8s.io/core:/stable:/v${K8S_VERSION:0:4}/deb/Release.key" | gpg --dearmor -o /etc/apt/keyrings/kubernetes-apt-keyring.gpg
 echo "deb [signed-by=/etc/apt/keyrings/kubernetes-apt-keyring.gpg] https://pkgs.k8s.io/core:/stable:/v${K8S_VERSION:0:4}/deb/ /" | tee /etc/apt/sources.list.d/kubernetes.list
 
@@ -100,7 +130,7 @@ apt-mark hold kubelet kubeadm kubectl
 # ============================================
 # 커널 모듈 및 sysctl 설정
 # ============================================
-echo "[5/7] 커널 설정..."
+echo "[6/8] 커널 설정..."
 
 # 필요한 모듈 로드
 cat > /etc/modules-load.d/k8s.conf <<EOF
@@ -121,7 +151,7 @@ sysctl --system
 # ============================================
 # NVIDIA 드라이버 설치 (Worker 노드용)
 # ============================================
-echo "[6/7] NVIDIA 드라이버 설치..."
+echo "[7/8] NVIDIA 드라이버 설치..."
 
 # GPU 존재 여부 확인
 if lspci | grep -qi nvidia; then
@@ -144,7 +174,7 @@ fi
 # ============================================
 # NVIDIA Container Toolkit 설치
 # ============================================
-echo "[7/7] NVIDIA Container Toolkit 설치..."
+echo "[8/8] NVIDIA Container Toolkit 설치..."
 
 if lspci | grep -qi nvidia; then
     # NVIDIA Container Toolkit 저장소 추가
