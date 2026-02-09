@@ -392,3 +392,26 @@ sudo ./unbind-vfio.sh
 sudo systemctl start containerd nvidia-fabricmanager nvidia-persistenced
 
 ```
+
+
+## GPU Pod Test
+```bash
+
+kubectl run cuda-test3 --rm -i --restart=Never \
+  --image=nvcr.io/nvidia/ai-dynamo/vllm-runtime:0.8.1 \
+  --overrides='{
+    "spec": {
+      "runtimeClassName": "nvidia",
+      "tolerations": [{"key": "nvidia.com/gpu", "operator": "Exists", "effect": "NoSchedule"}],
+      "containers": [{
+        "name": "cuda-test3",
+        "image": "nvcr.io/nvidia/ai-dynamo/vllm-runtime:0.8.1",
+        "command": ["python3", "-c", "import torch; print(\"CUDA:\", torch.cuda.is_available()); print(\"Devices:\", torch.cuda.device_count()); print(\"SUCCESS\" if torch.cuda.is_available() else \"FAILED\")"],
+        "resources": {"limits": {"nvidia.com/gpu": "1"}},
+        "env": [{"name": "NVIDIA_VISIBLE_DEVICES", "value": "all"}, {"name": "NVIDIA_DRIVER_CAPABILITIES", "value": "all"}]
+      }]
+    }
+  }' \
+  -n dynamo-system
+
+```

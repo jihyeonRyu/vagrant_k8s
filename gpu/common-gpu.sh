@@ -165,8 +165,14 @@ if lspci | grep -qi nvidia; then
     apt-get install -y "nvidia-driver-${NVIDIA_DRIVER_VERSION}-server" \
                        "nvidia-utils-${NVIDIA_DRIVER_VERSION}-server"
     
-    # nvidia-smi 확인 (드라이버 로드 전이라 실패할 수 있음)
-    echo "  드라이버 설치 완료. (재부팅 후 nvidia-smi 사용 가능)"
+    # Fabric Manager 설치 (H100 SXM 등 NVSwitch 기반 GPU에 필수)
+    # Fabric Manager 없으면 nvidia-smi는 되지만 CUDA 런타임 초기화 실패
+    apt-get install -y "nvidia-fabricmanager-${NVIDIA_DRIVER_VERSION}" 2>/dev/null && \
+        systemctl enable nvidia-fabricmanager && \
+        echo "  Fabric Manager 설치 완료." || \
+        echo "  Fabric Manager 패키지 없음 (PCIe GPU는 불필요)."
+    
+    echo "  드라이버 설치 완료."
 else
     echo "  NVIDIA GPU가 감지되지 않음. 드라이버 설치 생략."
 fi
@@ -192,19 +198,19 @@ if lspci | grep -qi nvidia; then
     nvidia-ctk runtime configure --runtime=containerd
     
     # CDI (Container Device Interface) 설정 생성
-    # 드라이버가 로드된 후에도 실행할 수 있도록 부팅 시 자동 실행 스크립트 추가
     mkdir -p /etc/cdi
     
-    # 부팅 시 CDI 설정 생성 스크립트 (드라이버 로드 후 실행)
+    # 부팅 시 CDI 설정 자동 생성 스크립트
     cat > /etc/systemd/system/nvidia-cdi-generate.service <<'EOFSERVICE'
 [Unit]
 Description=Generate NVIDIA CDI configuration
-After=nvidia-persistenced.service
-Requires=nvidia-persistenced.service
-ConditionPathExists=/dev/nvidia0
+After=containerd.service
+Wants=containerd.service
 
 [Service]
 Type=oneshot
+# /dev/nvidia0 나타날 때까지 최대 60초 대기
+ExecStartPre=/bin/bash -c 'for i in $(seq 1 60); do [ -e /dev/nvidia0 ] && exit 0; sleep 1; done; exit 1'
 ExecStart=/usr/bin/nvidia-ctk cdi generate --output=/etc/cdi/nvidia.yaml
 ExecStartPost=/bin/systemctl restart containerd
 RemainAfterExit=yes
@@ -221,7 +227,16 @@ EOFSERVICE
         echo "  NVIDIA 드라이버 로드됨. CDI 설정 생성..."
         nvidia-ctk cdi generate --output=/etc/cdi/nvidia.yaml
     else
-        echo "  NVIDIA 드라이버가 아직 로드되지 않음. 재부팅 후 CDI 설정이 자동 생성됩니다."
+        echo "  NVIDIA 드라이버가 아직 로드되지 않음."
+        echo "  드라이버 모듈 로드 시도..."
+        modprobe nvidia 2>/dev/null || true
+        sleep 3
+        if nvidia-smi &>/dev/null; then
+            echo "  드라이버 로드 성공. CDI 설정 생성..."
+            nvidia-ctk cdi generate --output=/etc/cdi/nvidia.yaml
+        else
+            echo "  ⚠️ 드라이버 로드 실패. 재부팅 후 자동 생성됩니다."
+        fi
     fi
     
     # containerd 재시작
