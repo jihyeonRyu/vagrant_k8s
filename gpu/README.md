@@ -231,6 +231,10 @@ lspci -nnk -d 10de: | grep -E "(3D controller|driver)"
 
 ```bash
 vagrant up
+
+
+# on host-side (if turned-off)
+sudo systemctl start containerd nvidia-fabricmanager
 ```
 
 프로비저닝은 약 10-15분 소요됩니다:
@@ -414,4 +418,8 @@ kubectl run cuda-test3 --rm -i --restart=Never \
   }' \
   -n dynamo-system
 
+
+# gpu-worker
+# VM 호스트에서 직접 CUDA 테스트 (컨테이너 X)
+python3 -c "import ctypes; lib = ctypes.CDLL('libcuda.so.1'); print('cuInit:', lib.cuInit(0))"
 ```

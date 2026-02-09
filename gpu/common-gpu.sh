@@ -165,14 +165,18 @@ if lspci | grep -qi nvidia; then
     apt-get install -y "nvidia-driver-${NVIDIA_DRIVER_VERSION}-server" \
                        "nvidia-utils-${NVIDIA_DRIVER_VERSION}-server"
     
-    # Fabric Manager 설치 (H100 SXM 등 NVSwitch 기반 GPU에 필수)
-    # Fabric Manager 없으면 nvidia-smi는 되지만 CUDA 런타임 초기화 실패
-    apt-get install -y "nvidia-fabricmanager-${NVIDIA_DRIVER_VERSION}" 2>/dev/null && \
-        systemctl enable nvidia-fabricmanager && \
-        echo "  Fabric Manager 설치 완료." || \
-        echo "  Fabric Manager 패키지 없음 (PCIe GPU는 불필요)."
+    # 드라이버 모듈 로드
+    modprobe nvidia 2>/dev/null || true
+    modprobe nvidia_uvm 2>/dev/null || true
+    
+    # Persistence mode 활성화
+    nvidia-smi -pm 1 2>/dev/null || true
     
     echo "  드라이버 설치 완료."
+    echo ""
+    echo "  ⚠️  참고: H100 SXM 등 NVSwitch 기반 GPU를 사용하는 경우"
+    echo "     호스트(물리 머신)에서 Fabric Manager가 실행 중이어야 CUDA가 동작합니다."
+    echo "     호스트에서: sudo systemctl start nvidia-fabricmanager"
 else
     echo "  NVIDIA GPU가 감지되지 않음. 드라이버 설치 생략."
 fi
