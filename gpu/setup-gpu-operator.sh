@@ -82,24 +82,39 @@ helm upgrade --install gpu-operator nvidia/gpu-operator \
     --wait \
     --timeout 10m
 
+# ============================================
+# NFS Subdir External Provisioner 설치
+# ============================================
+echo "[5/5] NFS StorageClass 설치..."
+
+CONTROL_PLANE_IP="192.168.122.10"
+
+helm repo add nfs-subdir https://kubernetes-sigs.github.io/nfs-subdir-external-provisioner
+helm repo update
+
+helm upgrade --install nfs-provisioner nfs-subdir/nfs-subdir-external-provisioner \
+    --set nfs.server=${CONTROL_PLANE_IP} \
+    --set nfs.path=/srv/nfs/k8s \
+    --set storageClass.name=nfs \
+    --set storageClass.defaultClass=false \
+    --set storageClass.reclaimPolicy=Retain \
+    --wait \
+    --timeout 3m
+
+echo "  NFS StorageClass 설치 완료"
+kubectl get storageclass nfs
+
 echo ""
 echo "=========================================="
-echo "GPU Operator 설치 완료!"
+echo "GPU Operator + NFS StorageClass 설치 완료!"
 echo "=========================================="
 echo ""
 echo "설치된 컴포넌트 확인:"
 kubectl get pods -n gpu-operator
 echo ""
+echo "StorageClass 확인:"
+kubectl get storageclass
+echo ""
 echo "GPU 노드 라벨 확인 (잠시 후 적용됨):"
 echo "  kubectl get nodes -L nvidia.com/gpu.present"
-echo ""
-echo "GPU 리소스 확인:"
-echo "  kubectl describe node <worker-node> | grep nvidia"
-echo ""
-echo "테스트 워크로드 실행:"
-cat <<'EOF'
-  kubectl run gpu-test --rm -it --restart=Never \
-    --image=nvidia/cuda:12.0-base \
-    --limits=nvidia.com/gpu=1 \
-    -- nvidia-smi
-EOF
+

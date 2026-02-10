@@ -71,6 +71,7 @@ apt-get install -y \
     gnupg \
     lsb-release \
     netcat-openbsd \
+    nfs-common \
     software-properties-common \
     socat \
     wget
