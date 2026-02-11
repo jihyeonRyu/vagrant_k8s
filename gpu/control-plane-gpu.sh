@@ -88,29 +88,6 @@ sed -i "s~encapsulation: VXLANCrossSubnet~encapsulation: VXLAN~g" custom-resourc
 kubectl create -f custom-resources.yaml
 rm -f custom-resources.yaml
 
-# ============================================
-# NFS 서버 설정 (모델 캐시 공유용)
-# ============================================
-echo "[5/5] NFS 서버 설정..."
-
-apt-get install -y nfs-kernel-server
-
-# NFS export 디렉토리 생성
-mkdir -p /srv/nfs/k8s
-chown nobody:nogroup /srv/nfs/k8s
-chmod 777 /srv/nfs/k8s
-
-# Worker 대역에 NFS export
-NETWORK_PREFIX="192.168.122"
-grep -q "/srv/nfs/k8s" /etc/exports 2>/dev/null || \
-  echo "/srv/nfs/k8s ${NETWORK_PREFIX}.0/24(rw,sync,no_subtree_check,no_root_squash)" >> /etc/exports
-
-exportfs -ra
-systemctl enable nfs-kernel-server
-systemctl restart nfs-kernel-server
-
-echo "  NFS export 설정 완료: /srv/nfs/k8s"
-
 echo ""
 echo "=========================================="
 echo "Control Plane 초기화 완료!"

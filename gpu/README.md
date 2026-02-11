@@ -230,8 +230,10 @@ lspci -nnk -d 10de: | grep -E "(3D controller|driver)"
 ### Step 4: 클러스터 생성
 
 ```bash
-vagrant up
 
+sudo ./setup-host-nfs.sh
+
+vagrant up
 
 # on host-side (if turned-off)
 sudo systemctl start containerd nvidia-fabricmanager

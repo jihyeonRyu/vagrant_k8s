@@ -87,17 +87,21 @@ helm upgrade --install gpu-operator nvidia/gpu-operator \
 # ============================================
 echo "[5/5] NFS StorageClass 설치..."
 
-CONTROL_PLANE_IP="192.168.122.10"
+# NFS 서버는 호스트(물리 머신)에서 실행됨 (setup-host-nfs.sh)
+# 호스트의 vagrant-libvirt 브릿지 IP = 192.168.122.1
+HOST_NFS_IP="192.168.122.1"
 
 helm repo add nfs-subdir https://kubernetes-sigs.github.io/nfs-subdir-external-provisioner
 helm repo update
 
 helm upgrade --install nfs-provisioner nfs-subdir/nfs-subdir-external-provisioner \
-    --set nfs.server=${CONTROL_PLANE_IP} \
+    --set nfs.server=${HOST_NFS_IP} \
     --set nfs.path=/srv/nfs/k8s \
     --set storageClass.name=nfs \
     --set storageClass.defaultClass=false \
     --set storageClass.reclaimPolicy=Retain \
+    --set image.repository=registry.k8s.io/sig-storage/nfs-subdir-external-provisioner \
+    --set image.tag=v4.0.2 \
     --wait \
     --timeout 3m
 
