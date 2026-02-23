@@ -16,7 +16,7 @@ echo "=========================================="
 # ============================================
 # Helm 설치
 # ============================================
-echo "[1/8] Helm 설치..."
+echo "[1/7] Helm 설치..."
 
 if ! command -v helm &> /dev/null; then
     curl -fsSL https://raw.githubusercontent.com/helm/helm/main/scripts/get-helm-3 | bash
@@ -29,7 +29,7 @@ helm version
 # ============================================
 # 노드 Ready 대기
 # ============================================
-echo "[2/8] 노드 Ready 상태 대기..."
+echo "[2/7] 노드 Ready 상태 대기..."
 
 TIMEOUT=300
 ELAPSED=0
@@ -55,7 +55,7 @@ done
 # ============================================
 # ingress-nginx 설치 (K8s on-prem only)
 # ============================================
-echo "[3/8] ingress-nginx 설치..."
+echo "[3/7] ingress-nginx 설치..."
 
 if kubectl get ns ingress-nginx >/dev/null 2>&1; then
     echo "  ingress-nginx가 이미 설치되어 있습니다. 건너뜁니다."
@@ -75,7 +75,7 @@ fi
 # - GPU Operator보다 먼저 설치해야 ServiceMonitor CRD가 존재함
 # - DCGM Exporter ServiceMonitor가 정상 생성되려면 필수
 # ============================================
-echo "[4/8] kube-prometheus-stack 설치..."
+echo "[4/7] kube-prometheus-stack 설치..."
 
 helm repo add prometheus-community https://prometheus-community.github.io/helm-charts --force-update
 
@@ -106,7 +106,7 @@ kubectl get crd servicemonitors.monitoring.coreos.com > /dev/null 2>&1 && \
 # ============================================
 # GPU Operator Helm 저장소 추가
 # ============================================
-echo "[5/8] GPU Operator Helm 저장소 추가..."
+echo "[5/7] GPU Operator Helm 저장소 추가..."
 
 helm repo add nvidia https://helm.ngc.nvidia.com/nvidia --force-update
 helm repo update
@@ -115,65 +115,29 @@ helm repo update
 # GPU Operator 설치
 # - driver.enabled=false: VM에 이미 드라이버가 설치됨
 # - toolkit.enabled=false: VM에 이미 Container Toolkit이 설치됨
-# - devicePlugin.enabled=false: DRA Driver가 대체
 # - dcgmExporter.serviceMonitor.enabled=true: Prometheus 연동
 # ============================================
-echo "[6/8] GPU Operator 설치..."
+echo "[6/7] GPU Operator 설치..."
 
 kubectl create namespace gpu-operator 2>/dev/null || true
-
-# Label nodes for DRA kubelet plugin (required for GPU Operator + DRA coexistence)
-for node in $(kubectl get nodes -o name); do
-    kubectl label "$node" nvidia.com/dra-kubelet-plugin=true --overwrite 2>/dev/null || true
-done
 
 helm upgrade --install gpu-operator nvidia/gpu-operator \
     --namespace gpu-operator \
     --set driver.enabled=false \
     --set toolkit.enabled=false \
-    --set devicePlugin.enabled=false \
+    --set devicePlugin.enabled=true \
     --set gfd.enabled=true \
     --set migManager.enabled=true \
     --set dcgmExporter.enabled=true \
     --set dcgmExporter.serviceMonitor.enabled=true \
     --set dcgmExporter.serviceMonitor.interval=15s \
-    --set 'driver.manager.env[0].name=NODE_LABEL_FOR_GPU_POD_EVICTION' \
-    --set 'driver.manager.env[0].value=nvidia.com/dra-kubelet-plugin' \
     --wait \
     --timeout 10m
 
 # ============================================
-# DRA Driver for GPUs 설치
-# - GPU allocation via DRA (replaces device plugin)
-# - Requires K8s 1.34+ (DRA enabled by default)
-# - Requires NVIDIA Driver 580+
-# ============================================
-echo "[7/8] DRA Driver for GPUs 설치..."
-
-if helm list -n nvidia-dra-driver-gpu -q 2>/dev/null | grep -q nvidia-dra-driver-gpu; then
-    echo "  DRA Driver가 이미 설치되어 있습니다. 건너뜁니다."
-else
-    helm upgrade --install nvidia-dra-driver-gpu nvidia/nvidia-dra-driver-gpu \
-        --version="25.12.0" \
-        --namespace nvidia-dra-driver-gpu \
-        --create-namespace \
-        --set nvidiaDriverRoot=/ \
-        --set gpuResourcesEnabledOverride=true \
-        --set-string 'kubeletPlugin.nodeSelector.nvidia\.com/dra-kubelet-plugin=true' \
-        --wait \
-        --timeout 5m
-
-    echo "  ✅ DRA Driver 설치 완료"
-fi
-
-# Validate DRA DeviceClasses
-echo "  DeviceClasses:"
-kubectl get deviceclass --no-headers 2>/dev/null || echo "  (DeviceClass not yet available)"
-
-# ============================================
 # NFS Subdir External Provisioner 설치
 # ============================================
-echo "[8/8] NFS StorageClass 설치..."
+echo "[7/7] NFS StorageClass 설치..."
 
 # NFS 서버는 호스트(물리 머신)에서 실행됨 (setup-host-nfs.sh)
 # 호스트의 vagrant-libvirt 브릿지 IP = 192.168.122.1
@@ -206,12 +170,6 @@ kubectl get pods -n monitoring --no-headers 2>/dev/null | head -5
 echo ""
 echo "GPU Operator:"
 kubectl get pods -n gpu-operator --no-headers 2>/dev/null | head -5
-echo ""
-echo "DRA Driver:"
-kubectl get pods -n nvidia-dra-driver-gpu --no-headers 2>/dev/null
-echo ""
-echo "DeviceClasses:"
-kubectl get deviceclass --no-headers 2>/dev/null
 echo ""
 echo "StorageClass:"
 kubectl get storageclass --no-headers
