@@ -68,10 +68,10 @@ else
         --namespace monitoring \
         --create-namespace \
         --set prometheus.prometheusSpec.podMonitorSelectorNilUsesHelmValues=false \
-        --set prometheus.prometheusSpec.podMonitorNamespaceSelector="{}" \
+        --set-json 'prometheus.prometheusSpec.podMonitorNamespaceSelector={}' \
         --set prometheus.prometheusSpec.serviceMonitorSelectorNilUsesHelmValues=false \
-        --set prometheus.prometheusSpec.serviceMonitorNamespaceSelector="{}" \
-        --set prometheus.prometheusSpec.probeNamespaceSelector="{}" \
+        --set-json 'prometheus.prometheusSpec.serviceMonitorNamespaceSelector={}' \
+        --set-json 'prometheus.prometheusSpec.probeNamespaceSelector={}' \
         --set grafana.adminPassword=admin \
         --set alertmanager.enabled=false \
         --wait \
