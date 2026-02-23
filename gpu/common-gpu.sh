@@ -9,7 +9,7 @@ set -e
 
 # 버전 설정
 K8S_VERSION="${K8S_VERSION:-1.34.3-1.1}"
-NVIDIA_DRIVER_VERSION="${NVIDIA_DRIVER_VERSION:-550}"  # 서버용 안정 버전
+NVIDIA_DRIVER_VERSION="${NVIDIA_DRIVER_VERSION:-580}"  # Dynamo v0.9.0 requires 550+, 580+ recommended
 
 echo "=========================================="
 echo "GPU K8s 노드 공통 설정 시작"
