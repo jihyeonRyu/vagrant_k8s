@@ -8,7 +8,7 @@
 set -e
 
 # 버전 설정
-K8S_VERSION="${K8S_VERSION:-1.32.1-1.1}"
+K8S_VERSION="${K8S_VERSION:-1.34.3-1.1}"
 NVIDIA_DRIVER_VERSION="${NVIDIA_DRIVER_VERSION:-550}"  # 서버용 안정 버전
 
 echo "=========================================="
