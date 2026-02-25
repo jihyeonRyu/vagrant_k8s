@@ -133,6 +133,9 @@ sudo systemctl start nvidia-fabricmanager nvidia-persistenced
 ```bash
 # on host
 vagrant rsync
+
+vagrant plugin install vagrant-rsync-back
+vagrant rsync-back
 ```
 
 자세한 내용은 [gpu/README.md](gpu/README.md)를 참조하세요.
